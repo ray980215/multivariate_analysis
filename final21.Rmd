@@ -1,0 +1,257 @@
+---
+title: "Final Exam, Multivariate Analysis, Spring 2021"
+author: "309657009 邱泓儒"
+date: "2021/6/10"
+output: rmarkdown::github_document
+---
+
+```{r warning=FALSE, message=FALSE}
+library(mclust)
+library(cluster)
+library(MASS)
+library(fBasics)
+library(rpart)
+library(rpart.plot)
+library(neuralnet)
+library(nnet)
+library(e1071)
+```
+
+
+```{r}
+setwd("C:/Users/ray98/Desktop/project/class/multivariate")
+train <- read.csv("etctrain.csv", header=T)
+test <- read.csv("etctest.csv", header=T)
+head(train)
+```
+
+我們所要分析的資料中，每一觀察值(列)(observation(row))代表自某一天所量得的車流量值，共包含25個變數(variable)。變數t1、t2、、t24，分別代表每天0時-1時、1時-2時、、23時-24時，通過該ETC門架的車輛總數。變數group代表觀察值所屬的星期別：1為星期天，2為星期一，3為星期二、三或四，4為星期五，5為星期六。
+
+# Question 1.multivariate mean inferences
+
+**To examine the traffic flow differences among different week groups, one can do the multivariate mean inferences on the etctrain dataset.**
+
+## (a)
+
+**Use the one-way MANOVA to examine the overall traffic flow differences among differentweek groups. Also, perform the one-way ANOVA on each “t” variable (24 variables in total) for thedifference in a specific time point.**
+
+```{r}
+# monava
+fit <- manova(as.matrix(train[, 1:24]) ~ as.factor(train[, 25]))
+summary(fit)
+
+# anova
+pv <- c()
+for(i in 1:24){
+  fit <- aov(train[,i] ~ as.factor(train[,25]))
+  pv <- c(pv, summary(fit)[[1]][1,5])
+}
+
+```
+
+## (b)
+
+**What do these tests tell you about traffic flow differences in five week groups in the MANOV Aanalysis? Since we need to perform the test for multiple time points simultaneously in the ANOVA analysis, what is the cut-off for the p-value, below which can be considered to be significant? How manytime points have significant differences?**
+
+$H_0$ of MANOVA test is $\mathbf{\mu_1}=\mathbf{\mu_2}=\mathbf{\mu_3}=\mathbf{\mu_4}=\mathbf{\mu_5}$,where  $\mathbf{\mu_i}$ is the mean vector of group i
+
+since p-value=2.2e-16, reject $H_0$, there is no evidence that $\mathbf{\mu_1}=\mathbf{\mu_2}=\mathbf{\mu_3}=\mathbf{\mu_4}=\mathbf{\mu_5}$
+
+
+$H_0$ of ANOVA test is $\mu_1=\mu_2=\mu_3=\mu_4=\mu_5$,where $\mu_i$ is the mean of group i
+
+since there are 24 ANOVA tests,the adjusted cut-off for the p-value is $0.05/24$
+```{r}
+alpha <- 0.05 / 24
+sum(pv < alpha)
+```
+all 24 time points have significant differences in five groups
+ 
+# Question 2 principal component analysis
+
+**With the etctrain dataset, perform the principal component analysis (PCA) on 24 “t” variables**
+
+## (a)
+
+**For PCA on the covariance matrix, how many principal components (PCs) are needed? Whatdo the PC loadings tell you about the PCs you select?**
+
+```{r}
+# PCA on the covariance matrix
+princov <- princomp(train[, -25], cor=F)
+summary(princov)
+
+```
+
+取一個pc即可以解釋超過80%的變異，再多取也不會改善非常多。沒有特別大的loading，表示變數(time points)間重要性差不多
+
+## (b)
+
+**For PCA on the correlation matrix, how many principal components (PCs) are needed? Whatdo the PC loadings tell you about the PCs you select?**
+
+```{r}
+# PCA on the correlation matrix
+princor <- princomp(train[, -25], cor=T)
+summary(princor)
+
+```
+
+取兩個pc即可以解釋超過80%的變異，再多取也不會改善非常多。沒有特別大的loading，表示變數(time points)間重要性差不多
+
+# Question 3 clustering
+## (a)
+
+**Which approach has the best performance in clustering the days from the same week grouptogether?(那一個方法，最能將原本屬於同一個group的日子，經分群法後也分到同一個cluster?)**
+
+```{r}
+da <- dist(train[,-25], method="euclidean")
+
+# agglomerative hierarchical clustering with averagelinkage
+fita <- hclust(da, method="average")
+cuta <- cutree(fita, k=5)
+table(cuta, train[,25])
+```
+
+正確分配的個數為147+45+44+11+0=247
+
+正確率為247/335=0.7373134
+```{r}
+# k-means
+set.seed(66)
+fitk <- kmeans(train[,-25], centers = 5)
+table(fitk$cluster, train[,25])
+```
+
+正確分配的個數為82+44+42+30+15=213(k-means法每次分群結果不同，但大約在這個值)
+
+正確率為213/335=0.6358209
+
+```{r}
+# model-based
+fitmb <- Mclust(train[,-25], G = 5)
+table(fitmb$classification, train[,25])
+```
+
+正確分配的個數為81+46+44+41+1=213
+
+正確率為213/335=0.6358209
+
+正確率最佳為agglomerative hierarchical clustering with average linkage
+
+
+
+## (b)
+
+**To assess cluster fit, you are asked to create the silhouette plot for each of the clustering approaches. Which approach has the best cluster fit based on the average silhouette width?**
+
+```{r}
+sia <- silhouette(cuta, da)
+plot(sia)
+sik <- silhouette(fitk$cluster, da)
+plot(sik)
+simb <- silhouette(fitmb$classification, da)
+plot(simb)
+```
+
+agglomerative hierarchical clustering with average linkage is the best，since it has the largest average silhouette width
+
+# Question 4 classification
+
+**We want to predict observations’ week groups using the 24 “t” variables. You are asked to evaluatethe performance of various prediction methods.Use the etctrain dataset to train your model and the etctest dataset to test it. The prediction methods you will evaluate are the linear discriminant analysis, classificationand regression tree, neural networks, and support vector machine. Which prediction method performs best?**
+
+```{r}
+# linear discriminant analysis
+xname <- colnames(train)[-25]
+fmla <- as.formula(paste("as.factor(group) ~ ", paste(xname, collapse= "+")))
+fitlda <- lda(fmla, prior=rep(0.2, 5), data = train, na.action="na.omit")
+testlda <- predict(fitlda, test[,-25])$class
+table(test[,25], testlda)
+accuracy <- tr(table(test[,25], testlda)) / 100
+cat("misclassification rate = ", 1-accuracy, "\n")
+
+# classification and regression tree
+fittreec <- rpart(fmla, data=train, method="class", cp=10^(-5))
+printcp(fittreec)
+cbestcp <- fittreec$cptable[which.min(fittreec$cptable[,"xerror"]),"CP"]
+fittreecbest <- prune(fittreec, cp=cbestcp)
+traintreec <- predict(fittreecbest, test[,-25])
+getmax <- function(row){
+  a <- sample(colnames(traintreec)[which(row == max(row))],1)
+  return(as.numeric(a))
+}
+traintreec_Class <- apply(traintreec, 1, getmax)
+
+table(test[,25], traintreec_Class)
+accuracy <- tr(table(test[,25], traintreec_Class)) / 100
+cat("misclassification rate = ", 1-accuracy, "\n")
+
+# neural networks
+scaled1 <- as.matrix(scale(train[,-25]))
+trains <- cbind(scaled1, train[,25])
+colnames(trains) <- colnames(train)
+scaled2 <- scale(test[,-25], center=attr(scaled1,"scaled:center"), 
+                 scale=attr(scaled1,"scaled:scale"))
+tests <- cbind(scaled2, test[,25])
+colnames(tests) <- colnames(test)
+
+a <- class.ind(trains[,25])
+colnames(a) <- paste("a", colnames(a), sep="")
+yname <- colnames(a)
+xname <- colnames(trains)[-25]
+fmlann <- as.formula(paste(paste(yname, collapse="+"), " ~ ", paste(xname, collapse="+")))
+fitnn1 <- neuralnet(fmlann, data=cbind(a, trains[,-25]), 
+                    hidden=c(12),
+                    err.fct="ce", act.fct="logistic",
+                    linear.output=FALSE)
+fitnn2 <- neuralnet(fmlann, data=cbind(a, trains[,-25]), 
+                    hidden=c(64, 16),
+                    err.fct="ce", act.fct="logistic",
+                    linear.output=FALSE)
+fitnn3 <- neuralnet(fmlann, data=cbind(a, trains[,-25]), 
+                    hidden=c(64, 64, 16), 
+                    err.fct="ce", act.fct="logistic",
+                    linear.output=FALSE)
+fitnn4 <- neuralnet(fmlann, data=cbind(a, trains[,-25]), 
+                    hidden=c(64, 64, 16, 16),
+                    err.fct="ce", act.fct="logistic",
+                    linear.output=FALSE)
+prednn <- function(fitnn)
+{ 
+  btrain <- tests[,-25]
+  prednn <- compute(fitnn, btrain)
+  resind <- apply(prednn$net.result, 1, which.max)
+  confusion <- table(resind, tests[,25])
+  cat("Confusion table")
+  print(confusion)
+  accuracy <- sum(diag(confusion))/length(resind)
+  cat("misclassification rate = ", 1-accuracy, "\n")
+}
+prednn(fitnn1)
+prednn(fitnn2)
+prednn(fitnn3)
+prednn(fitnn4)
+
+# support vector machine
+fitsvml <- svm(fmla, kernel="linear", cross=10, data=trains)
+fitsvmp <- svm(fmla, kernel="polynomial", cross=10, data=trains)
+fitsvmr <- svm(fmla, kernel="radial", cross=10, data=trains)
+fitsvms <- svm(fmla, kernel="sigmoid", cross=10, data=trains)
+
+predsvm <- function(fitsvm)
+{ 
+  trainsvm <- predict(fitsvm, tests[,-25])
+  confusion <- table(tests[,25], trainsvm)
+  cat("Confusion table")
+  print(confusion)
+  accuracy <- tr(table(tests[,25], trainsvm)) / 100
+  cat("misclassification rate = ", 1-accuracy, "\n")
+}
+
+predsvm(fitsvml)
+predsvm(fitsvmp)
+predsvm(fitsvmr)
+predsvm(fitsvms)
+
+```
+
+若以錯分率為標準，support vector machine with linear/radial kernel 為最佳預測方法
+
