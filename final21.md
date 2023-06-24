@@ -198,6 +198,11 @@ summary(princor)
 
 # Question 3 clustering
 
+**Using the 24 “t” variables from the etctrain dataset, do the
+agglomerative hierarchical clustering with averagelinkage, k-means
+clustering, and model-based clustering with the number of clusters
+equaling 5.**
+
 ## (a)
 
 **Which approach has the best performance in clustering the days from
@@ -207,7 +212,7 @@ grouptogether?(那一個方法，最能將原本屬於同一個group的日子，
 ``` r
 da <- dist(train[,-25], method="euclidean")
 
-# agglomerative hierarchical clustering with averagelinkage
+# agglomerative hierarchical clustering with average linkage
 fita <- hclust(da, method="average")
 cuta <- cutree(fita, k=5)
 table(cuta, train[,25])
@@ -272,27 +277,113 @@ fit based on the average silhouette width?**
 
 ``` r
 sia <- silhouette(cuta, da)
-plot(sia)
+summary(sia)
 ```
 
-![](final21_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+    ## Silhouette of 335 units in 5 clusters from silhouette.default(x = cuta, dist = da) :
+    ##  Cluster sizes and average silhouette widths:
+    ##       230        47        46        11         1 
+    ## 0.5043910 0.4238000 0.3596224 0.3733611 0.0000000 
+    ## Individual silhouette widths:
+    ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+    ## -0.2109  0.3962  0.5039  0.4674  0.6027  0.6797
 
 ``` r
 sik <- silhouette(fitk$cluster, da)
-plot(sik)
+summary(sik)
 ```
 
-![](final21_files/figure-gfm/unnamed-chunk-10-2.png)<!-- -->
+    ## Silhouette of 335 units in 5 clusters from silhouette.default(x = fitk$cluster, dist = da) :
+    ##  Cluster sizes and average silhouette widths:
+    ##        45        48       104        94        44 
+    ## 0.3583644 0.1476047 0.1777230 0.3941301 0.4345801 
+    ## Individual silhouette widths:
+    ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+    ## -0.1202  0.1609  0.3055  0.2921  0.4459  0.5918
 
 ``` r
 simb <- silhouette(fitmb$classification, da)
-plot(simb)
+summary(simb)
 ```
 
-![](final21_files/figure-gfm/unnamed-chunk-10-3.png)<!-- -->
+    ## Silhouette of 335 units in 5 clusters from silhouette.default(x = fitmb$classification, dist = da) :
+    ##  Cluster sizes and average silhouette widths:
+    ##         119          68          48          43          57 
+    ##  0.13109426 -0.02871183  0.42195242  0.18930981  0.54775315 
+    ## Individual silhouette widths:
+    ##     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+    ## -0.76419  0.09041  0.26293  0.21870  0.44586  0.66519
 
 agglomerative hierarchical clustering with average linkage is the
 best，since it has the largest average silhouette width
+
+## (c)
+
+**For model-based clustering, write out the Gaussian mixture model used
+for clustering.Please specify the parameters to be estimated in the
+model.**
+
+``` r
+fitmb$BIC
+```
+
+    ## Bayesian Information Criterion (BIC): 
+    ##         EII       VII       EEI       VEI       EVI       VVI       EEE
+    ## 5 -105458.1 -103938.4 -100295.3 -98861.47 -99704.55 -97829.78 -96198.33
+    ##         VEE       EVE       VVE       EEV       VEV       EVV       VVV
+    ## 5 -94987.97 -95850.07 -94694.33 -99664.74 -98024.14 -100034.6 -98383.98
+    ## 
+    ## Top 3 models based on the BIC criterion: 
+    ##     VVE,5     VEE,5     EVE,5 
+    ## -94694.33 -94987.97 -95850.07
+
+VVE,5 has the best BIC value
+
+The estimated proportions:
+
+``` r
+print(fitmb$parameters$variance$scale)
+```
+
+    ## [1]  3265.047 10878.895 10520.008  4506.191  1722.020
+
+The estimated mean vectors:
+
+``` r
+print(fitmb$parameters$mean)
+```
+
+    ##          [,1]      [,2]      [,3]      [,4]      [,5]
+    ## t1   300.0723  545.1160  875.2240  613.9405  277.3134
+    ## t2   187.4795  295.0902  492.7060  280.5340  179.8813
+    ## t3   139.4288  196.9526  334.3527  153.7476  128.8948
+    ## t4   110.5461  154.8358  249.8113  115.2284  103.4232
+    ## t5   146.0462  183.8535  250.6241  149.6179  140.1320
+    ## t6   241.6438  285.0914  295.7081  355.7146  224.4233
+    ## t7   540.5192  579.5601  465.9378  963.2811  520.2039
+    ## t8  1398.5739 1192.5134  808.4191 1895.5102 1351.8218
+    ## t9  1505.1911 1282.7660 1027.5638 1819.3925 1447.1964
+    ## t10 1228.0680 1271.0125 1373.1859 1369.8500 1137.7073
+    ## t11 1085.9796 1317.6280 1865.3898 1225.5693  997.8851
+    ## t12 1158.9000 1435.4867 2243.2012 1283.6634 1058.5907
+    ## t13 1218.3753 1445.6929 2285.3670 1313.6808 1109.3553
+    ## t14 1555.7242 1767.1694 2478.9714 1619.2975 1433.4320
+    ## t15 1746.1067 2033.0853 2627.7856 1831.1555 1567.0690
+    ## t16 2006.8561 2333.0044 2752.4119 2096.3462 1756.3041
+    ## t17 2335.4035 2577.1495 2808.1012 2372.4235 2052.8658
+    ## t18 2530.3166 2694.5893 2859.7057 2504.6102 2195.5437
+    ## t19 2176.3282 2588.2351 2750.8940 2143.2440 1756.8757
+    ## t20 1702.4224 2379.4520 2601.6235 1692.2333 1332.1208
+    ## t21 1422.7978 2205.4668 2624.9772 1428.0539 1092.7441
+    ## t22 1160.3891 2010.9132 2568.3698 1076.7467  919.7126
+    ## t23  868.8461 1792.1877 2303.6588  780.4052  704.7848
+    ## t24  565.7815 1230.6925 1631.9917  478.5176  447.3406
+
+To see the estimated covariance matrices, use
+
+``` r
+fitmb$parameters$variance$sigma
+```
 
 # Question 4 classification
 

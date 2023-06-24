@@ -98,6 +98,9 @@ summary(princor)
 取兩個pc即可以解釋超過80%的變異，再多取也不會改善非常多。沒有特別大的loading，表示變數(time points)間重要性差不多
 
 # Question 3 clustering
+
+**Using the 24 “t” variables from the etctrain dataset, do the agglomerative hierarchical clustering with averagelinkage, k-means clustering, and model-based clustering with the number of clusters equaling 5.**
+
 ## (a)
 
 **Which approach has the best performance in clustering the days from the same week grouptogether?(那一個方法，最能將原本屬於同一個group的日子，經分群法後也分到同一個cluster?)**
@@ -105,7 +108,7 @@ summary(princor)
 ```{r}
 da <- dist(train[,-25], method="euclidean")
 
-# agglomerative hierarchical clustering with averagelinkage
+# agglomerative hierarchical clustering with average linkage
 fita <- hclust(da, method="average")
 cuta <- cutree(fita, k=5)
 table(cuta, train[,25])
@@ -145,14 +148,42 @@ table(fitmb$classification, train[,25])
 
 ```{r}
 sia <- silhouette(cuta, da)
-plot(sia)
+summary(sia)
 sik <- silhouette(fitk$cluster, da)
-plot(sik)
+summary(sik)
 simb <- silhouette(fitmb$classification, da)
-plot(simb)
+summary(simb)
 ```
 
 agglomerative hierarchical clustering with average linkage is the best，since it has the largest average silhouette width
+
+## (c)
+
+**For model-based clustering, write out the Gaussian mixture model used for clustering.Please specify the parameters to be estimated in the model.**
+
+```{r}
+fitmb$BIC
+```
+
+VVE,5 has the best BIC value
+
+The estimated proportions:
+
+```{r}
+print(fitmb$parameters$variance$scale)
+```
+
+The estimated mean vectors:
+
+```{r}
+print(fitmb$parameters$mean)
+```
+
+To see the estimated covariance matrices, use 
+
+```{r, results = 'hide'}
+fitmb$parameters$variance$sigma
+```
 
 # Question 4 classification
 
